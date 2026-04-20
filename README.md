@@ -1,8 +1,8 @@
-# Deployment Lab
+# Production-Ready Deployment Lab
 
-> Kubernetes · Go · Docker · GitHub Actions · Prometheus · Grafana · k6
+> **Total time ~2.5 hours** | Kubernetes · Go · Docker · GitHub Actions · Prometheus · Grafana · k6
 
-## โครงสร้างโฟลเดอร์
+## Repository Structure
 
 ```text
 deployment/
@@ -10,7 +10,7 @@ deployment/
 │   └── workflows/
 │       └── ci-cd.yml           # GitHub Actions CI/CD pipeline
 ├── api/
-│   ├── main.go                 # Go (Gin) API พร้อม health probes + metrics
+│   ├── main.go                 # Go (Gin) API with health probes + metrics
 │   ├── go.mod
 │   ├── Dockerfile              # Multi-stage build
 │   └── .dockerignore
@@ -25,22 +25,22 @@ deployment/
 │   └── hurl/
 │       └── api.hurl            # Hurl functional test
 ├── TROUBLESHOOTING.md          # Common errors & quick fixes
-└── README.md                   # คู่มือนี้
+└── README.md                   # This guide
 ```
 
 ---
 
-## เครื่องมือที่ใช้ในการทำ Lab – Google Cloud Shell
+## Lab Environment – Google Cloud Shell
 
-> Lab นี้ใช้ **Google Cloud Shell** เป็น Environment หลัก ไม่ต้องติดตั้งอะไรบนเครื่องตัวเอง
+> This lab uses **Google Cloud Shell** as the primary environment — no local installation required.
 
-### วิธีเข้าใช้ Google Cloud Shell
+### How to Access Google Cloud Shell
 
-1. เปิดเบราว์เซอร์แล้วไปที่ [https://ssh.cloud.google.com](https://ssh.cloud.google.com)
-2. Login ด้วย Google Account (ต้องเปิดใช้ Google Cloud Project ไว้ก่อน)
-3. รอจนหน้าจอ Terminal พร้อมใช้งาน (ประมาณ 10-30 วินาที)
+1. Open your browser and go to [https://ssh.cloud.google.com](https://ssh.cloud.google.com)
+2. Sign in with your Google Account (a Google Cloud Project must be active)
+3. Wait for the terminal to be ready (approximately 10–30 seconds)
 
-### ตรวจสอบ Tools ที่มีใน Cloud Shell
+### Verify Pre-installed Tools
 
 ```bash
 docker --version
@@ -49,9 +49,9 @@ go version
 git --version
 ```
 
-> **หมายเหตุ:** Minikube และ k6 ต้องติดตั้งเพิ่มใน Cloud Shell ตามขั้นตอน Pre-requisites ด้านล่าง
+> **Note:** Minikube, k6, and Hurl must be installed manually in Cloud Shell — see the steps below.
 
-### ติดตั้ง Minikube บน Cloud Shell
+### Install Minikube on Cloud Shell
 
 ```bash
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
@@ -59,7 +59,7 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube
 minikube version
 ```
 
-### ติดตั้ง k6 บน Cloud Shell
+### Install k6 on Cloud Shell
 
 ```bash
 sudo gpg -k
@@ -70,7 +70,7 @@ echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.i
 sudo apt-get update && sudo apt-get install k6
 ```
 
-### ติดตั้ง Hurl บน Cloud Shell
+### Install Hurl on Cloud Shell
 
 ```bash
 curl -LO https://github.com/Orange-OpenSource/hurl/releases/latest/download/hurl_amd64.deb
@@ -80,38 +80,38 @@ hurl --version
 
 ---
 
-## ก่อนเริ่ม Lab – Pre-requisites
+## Pre-requisites
 
-| เครื่องมือ | ติดตั้ง |
-|-----------|---------|
+| Tool | Install |
+| ---- | ------- |
 | Docker | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
 | Minikube | `curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && sudo install minikube-linux-amd64 /usr/local/bin/minikube` |
 | kubectl | `curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install kubectl /usr/local/bin/kubectl` |
-| Go 1.22+ | `sudo apt install golang-go` หรือ [go.dev/dl](https://go.dev/dl/) |
-| k6 | `sudo apt install k6` หรือ [k6.io/docs/get-started/installation](https://k6.io/docs/get-started/installation/) |
-| Hurl | `curl -LO https://github.com/Orange-OpenSource/hurl/releases/latest/download/hurl-x86_64-unknown-linux-gnu.tar.gz` |
+| Go 1.22+ | `sudo apt install golang-go` or [go.dev/dl](https://go.dev/dl/) |
+| k6 | `sudo apt install k6` or [k6.io/docs/get-started/installation](https://k6.io/docs/get-started/installation/) |
+| Hurl | `curl -LO https://github.com/Orange-OpenSource/hurl/releases/latest/download/hurl_amd64.deb && sudo dpkg -i hurl_amd64.deb` |
 
 ---
 
-## Phase 1 – Environment Setup (15-20 นาที)
+## Phase 1 – Environment Setup (15–20 min)
 
 ### 1.1 Fork & Clone Template Repo
 
 ```bash
-# Fork repo นี้บน GitHub แล้ว clone ลงเครื่อง
+# Fork this repo on GitHub, then clone it
 git clone https://github.com/<YOUR_USERNAME>/deployment.git
 cd deployment
 ```
 
-### 1.2 เริ่ม Minikube
+### 1.2 Start Minikube
 
 ```bash
 minikube start --driver=docker --cpus=4 --memory=4096
 ```
 
-ผลลัพธ์ที่คาดหวัง: `Done! kubectl is now configured to use "minikube" cluster`
+Expected output: `Done! kubectl is now configured to use "minikube" cluster`
 
-### 1.3 ตรวจ Node
+### 1.3 Verify Node
 
 ```bash
 kubectl get nodes
@@ -119,16 +119,16 @@ kubectl get nodes
 # minikube   Ready    control-plane   30s   v1.xx.x
 ```
 
-### 1.4 เปิด Kubernetes Dashboard (ทางเลือก)
+### 1.4 Open Kubernetes Dashboard (optional)
 
 ```bash
 minikube dashboard &
-# กด Web Preview → Preview on Port 41655 (port จะเปลี่ยนไปตาม minikube)
+# Click Web Preview → Preview on Port 41655 (port may vary)
 ```
 
 ---
 
-## Phase 2 – Database & Networking (20 นาที)
+## Phase 2 – Database & Networking (20 min)
 
 ### 2.1 Deploy PostgreSQL
 
@@ -136,83 +136,83 @@ minikube dashboard &
 kubectl apply -f k8s/postgres-db.yaml
 ```
 
-### 2.2 ตรวจสอบ Pod และ Service
+### 2.2 Verify Pods and Services
 
 ```bash
-kubectl get pods -w          # รอจนสถานะเป็น Running
-kubectl get svc db-service   # ดูว่า ClusterIP และ Port 5432 ถูกต้อง
+kubectl get pods -w          # Wait until status is Running
+kubectl get svc db-service   # Confirm ClusterIP and port 5432
 ```
 
-> **แนวคิดสำคัญ:** App เรียกหา `db-service` แทน IP Address  
-> เพราะ K8s DNS resolve ชื่อ Service → ClusterIP ให้อัตโนมัติ  
-> IP อาจเปลี่ยนทุกครั้งที่ Pod restart แต่ชื่อ Service คงที่เสมอ
+> **Key concept:** The app connects to `db-service` by name, not by IP address.  
+> Kubernetes DNS automatically resolves the Service name to its ClusterIP.  
+> The IP may change every time a Pod restarts, but the Service name always stays the same.
 
-### 2.3 ทดสอบต่อ Database
+### 2.3 Test Database Connection
 
 ```bash
 kubectl exec -it deploy/postgres -- psql -U postgres -d appdb -c "\dt"
-# ถ้าเห็น table "items" แสดงว่า init script ทำงานสำเร็จ
+# If you see the "items" table, the init script ran successfully
 ```
 
 ---
 
-## Phase 3 – The Reliable Go API (30 นาที)
+## Phase 3 – The Reliable Go API (30 min)
 
-### 3.1 ทำความเข้าใจ Code หลัก 3 ส่วน
+### 3.1 Understand the Three Key Sections
 
-เปิดไฟล์ `api/main.go` แล้วดู:
+Open `api/main.go` and review:
 
-| ส่วน | บรรทัด | คำอธิบาย |
-|------|--------|----------|
-| **Health Probes** | `healthLive()`, `healthReady()` | `/livez` = container ยังมีชีวิต, `/readyz` = พร้อมรับ Traffic |
-| **Graceful Shutdown** | `signal.Notify(quit, syscall.SIGTERM)` | ดักจับสัญญาณ SIGTERM จาก K8s แล้ว drain connection ก่อน exit |
-| **Prometheus Metrics** | `prometheusMiddleware()` | นับ request count และ duration ทุก endpoint |
+| Section | Function | Description |
+| ------- | -------- | ----------- |
+| **Health Probes** | `healthLive()`, `healthReady()` | `/livez` = container is alive, `/readyz` = ready to receive traffic |
+| **Graceful Shutdown** | `signal.Notify(quit, syscall.SIGTERM)` | Catches SIGTERM from Kubernetes and drains connections before exiting |
+| **Prometheus Metrics** | `prometheusMiddleware()` | Counts request totals and durations for every endpoint |
 
 ### 3.2 Build Docker Image
 
 ```bash
 cd api
 
-# Download dependencies ก่อน (สร้าง go.sum)
+# Download dependencies (generates go.sum)
 go mod tidy
 
 cd ..
 
-# Build image (multi-stage)
+# Build the image (multi-stage)
 docker build -t <DOCKER_USERNAME>/go-api:latest ./api
 
-# ดูขนาด image (ควรเล็กมากเพราะ scratch base)
+# Check image size (should be very small due to scratch base)
 docker images | grep go-api
 ```
 
-### 3.3 ทดสอบ Local ก่อน Push
+### 3.3 Test Locally Before Pushing
 
 ```bash
-# รัน container พร้อม env vars
+# Run container with environment variables
 docker run --rm -p 8080:8080 \
   -e DB_HOST=host.docker.internal \
   <DOCKER_USERNAME>/go-api:latest &
 
-# ทดสอบ endpoint
+# Test endpoints
 curl http://localhost:8080/livez
 curl http://localhost:8080/readyz
 curl http://localhost:8080/
 
-# หยุด container
+# Stop the container
 docker stop $(docker ps -q --filter ancestor=<DOCKER_USERNAME>/go-api:latest)
 ```
 
-### 3.4 Push Image ขึ้น Docker Hub
+### 3.4 Push Image to Docker Hub
 
 ```bash
 docker login
 docker push <DOCKER_USERNAME>/go-api:latest
 ```
 
-### 3.5 อัปเดต image name ใน k8s/api-deployment.yaml
+### 3.5 Update Image Name in k8s/api-deployment.yaml
 
 ```bash
-# แทนที่ DOCKER_USERNAME ด้วยชื่อจริง
+# Replace DOCKER_USERNAME with your actual username
 sed -i "s/DOCKER_USERNAME/<YOUR_DOCKERHUB_USERNAME>/g" k8s/api-deployment.yaml
 ```
 
@@ -220,10 +220,10 @@ sed -i "s/DOCKER_USERNAME/<YOUR_DOCKERHUB_USERNAME>/g" k8s/api-deployment.yaml
 
 ```bash
 kubectl apply -f k8s/api-deployment.yaml
-kubectl get pods -w   # รอจนสถานะ Running
+kubectl get pods -w   # Wait until status is Running
 ```
 
-### 3.7 ทดสอบ API ผ่าน Minikube
+### 3.7 Test the API via Minikube
 
 ```bash
 NODE_IP=$(minikube ip)
@@ -234,35 +234,35 @@ curl http://${NODE_IP}:30080/readyz
 
 ---
 
-## Phase 4 – CI/CD Automation (40 นาที)
+## Phase 4 – CI/CD Automation (40 min)
 
-### 4.1 ตั้งค่า GitHub Secrets
+### 4.1 Configure GitHub Secrets
 
-ไปที่ GitHub repo → **Settings → Secrets and variables → Actions** → New repository secret
+Go to your GitHub repo → **Settings → Secrets and variables → Actions** → New repository secret
 
 | Secret Name | Value |
-|-------------|-------|
-| `DOCKER_USERNAME` | Docker Hub username |
-| `DOCKER_TOKEN` | Docker Hub Access Token ([สร้างที่นี่](https://hub.docker.com/settings/security)) |
+| ----------- | ----- |
+| `DOCKER_USERNAME` | Your Docker Hub username |
+| `DOCKER_TOKEN` | Docker Hub Access Token ([create one here](https://hub.docker.com/settings/security)) |
 
-### 4.2 ติดตั้ง Self-hosted Runner บน Cloud Shell
+### 4.2 Install Self-hosted Runner on Cloud Shell
 
 ```bash
-# ไปที่ GitHub repo → Settings → Actions → Runners → New self-hosted runner
-# เลือก OS: Linux, Architecture: x64 แล้วทำตามคำสั่งที่หน้าจอแสดง
+# Go to GitHub repo → Settings → Actions → Runners → New self-hosted runner
+# Select OS: Linux, Architecture: x64, then follow the commands shown on screen
 
 mkdir -p ~/actions-runner && cd ~/actions-runner
 curl -o actions-runner-linux-x64-2.316.1.tar.gz -L \
   https://github.com/actions/runner/releases/download/v2.316.1/actions-runner-linux-x64-2.316.1.tar.gz
 tar xzf ./actions-runner-linux-x64-2.316.1.tar.gz
 
-# Config (ใช้ token จากหน้า GitHub)
+# Configure with the token from GitHub
 ./config.sh --url https://github.com/<YOUR_USERNAME>/deployment --token <TOKEN>
 
-# Start runner (ใช้ tmux ให้ทำงาน background)
+# Start runner in the background using tmux
 tmux new -s runner
 ./run.sh
-# กด Ctrl+B แล้ว D เพื่อ detach
+# Press Ctrl+B then D to detach
 ```
 
 ### 4.3 The Magic Moment – Test CI/CD
@@ -270,67 +270,67 @@ tmux new -s runner
 ```bash
 cd ~/deployment
 
-# แก้ไข welcome message ใน api/main.go
-# บรรทัด: "message": "Hello from Go API v1.0.0 🚀"
-# เปลี่ยนเป็น: "message": "Hello from Go API v2.0.0 ✨"
+# Edit the welcome message in api/main.go
+# Line: "message": "Hello from Go API v1.0.0 🚀"
+# Change to: "message": "Hello from Go API v2.0.0 ✨"
 
 git add api/main.go
 git commit -m "feat: update welcome message to v2.0.0"
 git push origin main
 ```
 
-ไปดู GitHub Actions → จะเห็น Pipeline รัน Build → Push → Deploy อัตโนมัติ!
+Watch GitHub Actions — the pipeline will automatically run Build → Push → Deploy!
 
 ```bash
-# ตรวจสอบว่า Pod อัปเดตแล้ว
+# Verify the Pod has been updated
 kubectl rollout status deployment/go-api
 curl http://$(minikube ip):30080/
 ```
 
 ---
 
-## Phase 5 – Load Test & Monitoring (30 นาที)
+## Phase 5 – Load Test & Monitoring (30 min)
 
 ### 5.1 Deploy Prometheus & Grafana
 
 ```bash
 kubectl apply -f k8s/prometheus.yaml
 kubectl apply -f k8s/grafana.yaml
-kubectl get pods -w   # รอทั้ง 2 ตัว Running
+kubectl get pods -w   # Wait until both Pods are Running
 ```
 
-### 5.2 เข้า Grafana ผ่าน Port-forward
+### 5.2 Access Grafana via Port-forward
 
 ```bash
 kubectl port-forward svc/grafana-service 3000:3000 &
-# เปิด http://localhost:3000
+# Open http://localhost:3000
 # Login: admin / admin123
 ```
 
-**ตั้งค่า Dashboard:**
-1. **Connections → Data Sources** → ตรวจว่า Prometheus URL = `http://prometheus-service:9090`
-2. **Dashboards → New → Import** → ใส่ ID `12708` (Go Metrics Dashboard) หรือ `1860` (Node Exporter)
-3. เพิ่ม Panel เอง:
-   - Query: `rate(http_requests_total[1m])` → ดู Request per second
-   - Query: `histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m]))` → ดู P95 latency
+**Configure a Dashboard:**
 
-### 5.3 รัน k6 Load Test
+1. **Connections → Data Sources** → Verify Prometheus URL = `http://prometheus-service:9090`
+2. **Dashboards → New → Import** → Enter ID `12708` (Go Metrics Dashboard) or `1860` (Node Exporter)
+3. Add custom panels:
+   - Query: `rate(http_requests_total[1m])` → Requests per second
+   - Query: `histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m]))` → P95 latency
+
+### 5.3 Run k6 Load Test
 
 ```bash
-# เปิด terminal ใหม่
-BASE_URL=http://$(minikube ip):30080 k6 run \
-  -e BASE_URL=http://$(minikube ip):30080 \
-  tests/k6/script.js
+# Open a new terminal
+k6 run -e BASE_URL=http://$(minikube ip):30080 tests/k6/script.js
 ```
 
-### 5.4 สังเกต Grafana
+### 5.4 Observe Grafana
 
-ดูกราฟใน Grafana ขณะที่ k6 ยิง:
-- **Request rate** จะพุ่งสูง
-- **CPU usage** ของ Pod จะเพิ่มขึ้น
-- **P95 latency** จะเปลี่ยนแปลงตาม load
+Watch the graphs in Grafana while k6 is running:
 
-### 5.5 ทดสอบ Functional ด้วย Hurl
+- **Request rate** will spike
+- **CPU usage** of Pods will increase
+- **P95 latency** will change with load
+
+### 5.5 Functional Test with Hurl
 
 ```bash
 hurl --variable base_url=http://$(minikube ip):30080 \
@@ -339,35 +339,37 @@ hurl --variable base_url=http://$(minikube ip):30080 \
 
 ---
 
-## Phase 6 – Scaling & Troubleshooting (20 นาที)
+## Phase 6 – Scaling & Troubleshooting (20 min)
 
 ### 6.1 Manual Scaling
 
-เมื่อเห็น CPU พุ่งใน Grafana:
+When you see CPU spike in Grafana:
 
 ```bash
 kubectl scale deployment go-api --replicas=5
-kubectl get pods -w   # ดู Pod ใหม่ถูกสร้าง
+kubectl get pods -w   # Watch new Pods being created
 ```
 
-### 6.2 ตรวจสอบการกระจาย Load ใน Grafana
+### 6.2 Verify Load Distribution in Grafana
 
-เพิ่ม Panel ใน Grafana ด้วย Query:
+Add a panel in Grafana with the query:
+
 ```promql
 rate(http_requests_total[30s])
 ```
-จะเห็นว่าแต่ละ Pod (label `pod`) รับ request คนละก้อน
+
+You will see each Pod (by `pod` label) handling a separate share of traffic.
 
 ### 6.3 Log Analysis
 
 ```bash
-# ดู log แบบ real-time ระหว่างที่ k6 ยิง
+# Stream logs in real-time during k6 test
 kubectl logs -f deployment/go-api
 
-# ดู log ของ Pod ที่ระบุ
+# Stream logs for a specific Pod
 kubectl logs -f <pod-name>
 
-# ดู log หลาย Pod พร้อมกัน (ต้องติดตั้ง stern)
+# Stream logs across multiple Pods simultaneously (requires stern)
 stern go-api
 ```
 
@@ -379,10 +381,10 @@ kubectl scale deployment go-api --replicas=2
 
 ---
 
-## สรุปสิ่งที่เรียนรู้
+## What You Learned
 
-| หัวข้อ | สิ่งที่ทำ |
-|--------|---------|
+| Topic | What was done |
+| ----- | ------------- |
 | **Reliability** | Health probes (`/livez`, `/readyz`) + Graceful shutdown |
 | **Observability** | Prometheus metrics + Grafana dashboard |
 | **Automation** | GitHub Actions + Self-hosted Runner |
@@ -391,6 +393,6 @@ kubectl scale deployment go-api --replicas=2
 
 ---
 
-## ถ้าติดปัญหา
+## Stuck?
 
-ดู [TROUBLESHOOTING.md](TROUBLESHOOTING.md) สำหรับ error ที่พบบ่อยและวิธีแก้ไข
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common errors and quick fixes.
